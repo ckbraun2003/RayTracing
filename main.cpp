@@ -1,28 +1,28 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <iostream>
 #include <cmath>
 
 #include "shader.hpp"
+#include "objects.hpp"
+#include "_utils.hpp"
 
-int window_width = 800;
-int window_height = 800;
+#include "_draw/triangle.hpp"
+#include "_draw/sphere.hpp"
 
-
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-  glViewport(0, 0, width, height);
-}
-
-void processInput(GLFWwindow *window)
-{
-  if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-    glfwSetWindowShouldClose(window, true);
-}
+int width = 800;
+int height = 600;
+float fov = 45;
 
 int main()
 {
+  WindowConfig window_config(width, height, fov);
+  Objects objects;
+
+  // Add objects to Objects Structure
+  objects.AddObject(std::make_shared<Sphere>(glm::vec3(0.0), 1.0, 32, 32, glm::vec3(0.0)));
 
   // Initializes the Window Configuration for GLFW (need to look into more)
   glfwInit();
@@ -31,7 +31,7 @@ int main()
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
   // Creates the GLFW Window with a Width, Height, Title, etc
-  GLFWwindow* window = glfwCreateWindow(window_width, window_height, "Shaders", NULL, NULL);
+  GLFWwindow* window = glfwCreateWindow(window_config.w, window_config.h, "Shaders", NULL, NULL);
 
   // Error handling
   if (window == NULL)
@@ -52,28 +52,20 @@ int main()
   }
 
   // Tells OpenGL size of rendering window
-  glViewport(0, 0, window_width, window_height);
+  glViewport(0, 0, window_config.w, window_config.h);
+  glEnable(GL_DEPTH_TEST);
+
+  glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
+  glm::mat4 model = glm::mat4(1.0f);
 
   // Tells OpenGL to change render size when window size has changed
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-  // ---RENDERING A RECTANGLE---
-  float vertices[] = {
-    1.0f,  1.0f, 0.0f,  // top right
-    1.0f,  -1.0f, 0.0f,  // bottom right
-    -1.0f,  -1.0f, 0.0f,  // bottom left
-    -1.0f,  1.0f, 0.0f   // top left
-  };
-  unsigned int indices[] = {  // note that we start from 0!
-    0, 1, 3,   // first triangle
-    1, 2, 3    // second triangle
-  };
 
   // Create VBO or Vertex Buffer Object, it is how we store vertexes in GPU memory
   unsigned int VBO;
   glGenBuffers(1, &VBO); // Creates a buffer with an ID
   glBindBuffer(GL_ARRAY_BUFFER, VBO);  // Binds any changes made to that buffer to target
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW); // Copies defined data into the bound buffer
+  glBufferData(GL_ARRAY_BUFFER, objects.sceneVertices.size() * sizeof(Vertex), objects.sceneVertices.data(), GL_STATIC_DRAW);
 
   // Creates VAO or Vertex Array Object, This is like a state manager for vertex attribute changes
   unsigned int VAO;
@@ -83,37 +75,50 @@ int main()
   unsigned int EBO;
   glGenBuffers(1, &EBO);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, objects.sceneIndices.size() * sizeof(unsigned int), objects.sceneIndices.data(), GL_STATIC_DRAW);
 
   // Creates Vertex Attribute Pointers for the vector buffer
-  // Position attribute (location = 0)
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+  // Position attribute (location = 0) aPosition
   glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, pos));
 
+  // Position attribute (location = 1) aColor
+  glEnableVertexAttribArray(1);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, col));
+
+  // Unbind Vertex Array
   glBindVertexArray(0);
 
   // Create Shader object with vertex and fragment files, simply handles the compilation and deletion
-  Shader shader = Shader("glsl/basic_vertex.vert", "glsl/neon_circles_fragment.frag");
+  Shader shader = Shader("glsl/basic_vertex.vert", "glsl/ray_tracing_fragment.frag");
 
   // Main render loop
   while(!glfwWindowShouldClose(window))
   {
     processInput(window);
 
-    int fb_width, fb_height;
-    glfwGetFramebufferSize(window, &fb_width, &fb_height);
+    glfwGetFramebufferSize(window, &window_config.w, &window_config.h);
+
+    // CRITICAL: Update the viewport in case the window size changed via drag/resize
+    glViewport(0, 0, window_config.w, window_config.h); // Add this here
+    float aspect_ratio = (float)window_config.w / (float)window_config.h;
+    glm::mat4 projection = glm::perspective(glm::radians(window_config.fov), aspect_ratio, 0.1f, 100.0f);
+
+    // Recalculate the combined MVP matrix
+    glm::mat4 mvp = projection * view * model;
 
     // CLear Buffer
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Uses shader -- Sets Vertex attribute
+    // Use shader and send the NEW MVP matrix
     shader.use();
-    shader.setVec2("uResolution", fb_width, fb_height);
+    shader.setMat4("uMVP", mvp);
+    shader.setVec2("uResolution", window_config.w, window_config.h);
     shader.setFloat("uTime", glfwGetTime());
 
     glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, objects.sceneIndices.size(), GL_UNSIGNED_INT, 0);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
