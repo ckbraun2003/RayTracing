@@ -6,9 +6,9 @@
 #include "objects.hpp"
 #include "vertex.hpp"
 
-struct Triangle : public Object {
+struct Plane : public Object {
 public:
-  Triangle(glm::vec3 center, float size, glm::vec4 color)
+  Plane(glm::vec3 center, float size, glm::vec4 color)
     : Object(center, color)
     , size(size)
   {

@@ -58,9 +58,13 @@ public:
     {
       glUniform1f(glGetUniformLocation(ID, name.c_str()), value);
     }
-  void setVec2(const char* name, float x, float y)
+  void setVec2(const char* name, glm::vec2 value)
   {
-    glUniform2f(glGetUniformLocation(ID, name), x, y);
+    glUniform2f(glGetUniformLocation(ID, name), value.x, value.y);
+  }
+  void setVec3(const char* name, glm::vec3 value)
+  {
+    glUniform3f(glGetUniformLocation(ID, name), value.x, value.y, value.z);
   }
   void setMat4(const char* name, const glm::mat4 &mat) const
   {

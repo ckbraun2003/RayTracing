@@ -7,9 +7,11 @@
 #include "objects.hpp"
 #include "vertex.hpp"
 
-class Sphere : public Object {
+struct Sphere : public Object {
 public:
-  Sphere(glm::vec3 center, float radius, int sectors, int stacks, glm::vec3 color)
+  Sphere(glm::vec3 center, float radius, int sectors, int stacks, glm::vec4 color)
+    : Object(center, color)
+    , radius(radius)
   {
     const float PI = acos(-1.0f);
     const float sectorStep = 2.0f * PI / sectors;
@@ -28,8 +30,7 @@ public:
         float y = xy * sin(sectorAngle);
 
         // Add the vertex to the list
-        glm::vec3 position = glm::vec3(x, y, z);
-        vertices.push_back({position + center, color});
+        vertices.push_back({glm::vec3(x, y, z) + center, color});
       }
     }
 
@@ -54,4 +55,6 @@ public:
       }
     }
   }
+private:
+  float radius;
 };

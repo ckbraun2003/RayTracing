@@ -15,4 +15,5 @@ build/
 *json
 
 cmake-build-debug/
+.idea/
 

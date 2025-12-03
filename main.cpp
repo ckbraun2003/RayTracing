@@ -14,15 +14,48 @@
 
 int width = 800;
 int height = 600;
-float fov = 45;
+float fov = 90;
+
+WindowConfig window_config(width, height, fov);
+Objects objects;
+
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
+glm::vec3 cameraDir = glm::normalize(cameraPos);
+
+float deltaTime = 0.0f;	// Time between current frame and last frame
+float lastFrame = 0.0f;
+
+void processInput(GLFWwindow *window)
+{
+  if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    glfwSetWindowShouldClose(window, true);
+  float currentFrame = glfwGetTime();
+  deltaTime = currentFrame - lastFrame;
+  lastFrame = currentFrame;
+
+  const float cameraSpeed = 2.5f * deltaTime; // adjust accordingly
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    cameraPos += cameraSpeed * cameraFront;
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    cameraPos -= cameraSpeed * cameraFront;
+  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+};
 
 int main()
 {
-  WindowConfig window_config(width, height, fov);
-  Objects objects;
-
   // Add objects to Objects Structure
-  objects.AddObject(std::make_shared<Sphere>(glm::vec3(0.0), 1.0, 32, 32, glm::vec3(0.0)));
+  objects.AddObject(std::make_shared<Sphere>(glm::vec3(1.0, 1.0, 0.0), 0.7, 32, 32, glm::vec4(1.0, 0.0, 0.0, 1.0)));
+  objects.AddObject(std::make_shared<Sphere>(glm::vec3(2.0, 2.0, 1.0), 0.7, 32, 32, glm::vec4(1.0, 0.0, 0.0, 1.0)));
+  objects.AddObject(std::make_shared<Sphere>(glm::vec3(2.0, 1.0, 1.0), 1.0, 32, 32, glm::vec4(1.0)));
+
+  objects.AddObject(std::make_shared<Sphere>(glm::vec3(-1.0, -1.0, 0.0), 0.7, 32, 32, glm::vec4(1.0, 0.0, 0.0, 1.0)));
+  objects.AddObject(std::make_shared<Sphere>(glm::vec3(-2.0, -2.0, 1.0), 0.7, 32, 32, glm::vec4(1.0, 0.0, 0.0, 1.0)));
+  objects.AddObject(std::make_shared<Sphere>(glm::vec3(-2.0, -1.0, 1.0), 1.0, 32, 32, glm::vec4(1.0)));
 
   // Initializes the Window Configuration for GLFW (need to look into more)
   glfwInit();
@@ -55,8 +88,12 @@ int main()
   glViewport(0, 0, window_config.w, window_config.h);
   glEnable(GL_DEPTH_TEST);
 
-  glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
+  // Calculate model, view, projection matrices
   glm::mat4 model = glm::mat4(1.0f);
+  glm::mat4 projection = glm::perspective(glm::radians(window_config.fov),
+    (float)window_config.w / (float)window_config.h, 0.1f, 100.0f);
+  glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));;
+
 
   // Tells OpenGL to change render size when window size has changed
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -90,7 +127,7 @@ int main()
   glBindVertexArray(0);
 
   // Create Shader object with vertex and fragment files, simply handles the compilation and deletion
-  Shader shader = Shader("glsl/basic_vertex.vert", "glsl/ray_tracing_fragment.frag");
+  Shader shader = Shader("glsl/basic_vertex.vert", "glsl/RayTracing_sphere_fragment.frag");
 
   // Main render loop
   while(!glfwWindowShouldClose(window))
@@ -101,21 +138,28 @@ int main()
 
     // CRITICAL: Update the viewport in case the window size changed via drag/resize
     glViewport(0, 0, window_config.w, window_config.h); // Add this here
-    float aspect_ratio = (float)window_config.w / (float)window_config.h;
-    glm::mat4 projection = glm::perspective(glm::radians(window_config.fov), aspect_ratio, 0.1f, 100.0f);
-
-    // Recalculate the combined MVP matrix
-    glm::mat4 mvp = projection * view * model;
 
     // CLear Buffer
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    //view = glm::translate(view, glm::vec3(0.0f, 0.0f, -0.001f));
+    //view = glm::rotate(view, 0.001f, glm::vec3(0.0f, 1.0f, 0.0f));
+    //model = glm::translate(model, glm::vec3(0.0f, 0.0f, -0.001f));
+    //model = glm::rotate(model, 0.002f, glm::vec3(0.0f, 1.0f, 0.0f));
+    // const float radius = 10.0f;
+    // float camX = sin(glfwGetTime()) * radius;
+    // float camZ = cos(glfwGetTime()) * radius;
+    view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+
     // Use shader and send the NEW MVP matrix
     shader.use();
-    shader.setMat4("uMVP", mvp);
-    shader.setVec2("uResolution", window_config.w, window_config.h);
+    shader.setMat4("model", model);
+    shader.setMat4("view", view);
+    shader.setMat4("projection", projection);
+    shader.setVec2("uResolution", glm::vec2(window_config.w, window_config.h));
     shader.setFloat("uTime", glfwGetTime());
+    shader.setVec3("uCameraDir", cameraDir);
 
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, objects.sceneIndices.size(), GL_UNSIGNED_INT, 0);
@@ -135,3 +179,4 @@ int main()
   return 0;
 
 }
+

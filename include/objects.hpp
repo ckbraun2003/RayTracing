@@ -3,9 +3,19 @@
 #include <vector>
 #include <memory>
 
+#include <glm/glm.hpp>
+
 #include "_draw/vertex.hpp"
 
 struct Object {
+
+  Object(glm::vec3 center, glm::vec4 color)
+    : center(center), color(color)
+  { }
+
+  glm::vec3 center;
+  glm::vec4 color;
+
   std::vector<Vertex> vertices;
   std::vector<unsigned int> indices;
 
