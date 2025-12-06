@@ -4,14 +4,24 @@
 #include <cmath>
 #include <glm/glm.hpp>
 
-#include "objects.hpp"
-#include "vertex.hpp"
+#include "_draw/triangle.hpp"
 
-struct Sphere : public Object {
-public:
-  Sphere(glm::vec3 center, float radius, int sectors, int stacks, glm::vec4 color)
-    : Object(center, color)
-    , radius(radius)
+
+struct GPUSphere {
+  GPUSphere(glm::vec3 center, Material material, float radius)
+    : center(center), material(material), radius(radius)
+  { }
+
+  glm::vec3 center;
+  float padding1;
+  Material material;
+  float radius;
+  float padding2[3];
+};
+
+struct Sphere {
+  Sphere(glm::vec3 center, float radius, int sectors, int stacks, Material material)
+    : center(center), radius(radius), material(material)
   {
     const float PI = acos(-1.0f);
     const float sectorStep = 2.0f * PI / sectors;
@@ -30,7 +40,7 @@ public:
         float y = xy * sin(sectorAngle);
 
         // Add the vertex to the list
-        vertices.push_back({glm::vec3(x, y, z) + center, color});
+        vertices.push_back({glm::vec3(x, y, z) + center});
       }
     }
 
@@ -55,6 +65,18 @@ public:
       }
     }
   }
+
+  GPUSphere GetGPUSphere() {
+    return GPUSphere{center, material, radius};
+  }
+
+  std::vector<Vertex> vertices;
+  std::vector<unsigned int> indices;
+
 private:
+  glm::vec3 center;
   float radius;
+
+  Material material;
+
 };
